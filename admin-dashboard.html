@@ -1,0 +1,818 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ICP Reception Dashboard</title>
+<style>
+  :root{
+    --navy:#0A1628; --navy-mid:#112240; --navy-light:#1A3460; --navy-border:#1E3A6E;
+    --gold:#C9A84C; --gold-light:#E8C97A; --gold-soft:rgba(201,168,76,0.12); --gold-glow:rgba(201,168,76,0.28);
+    --white:#FFFFFF; --text-sec:#E8EAF2; --text-muted:#A88C4A;
+    --free:#22C55E; --free-soft:rgba(34,197,94,0.13);
+    --occupied:#EF4444; --occ-soft:rgba(239,68,68,0.13);
+    --soon:#F59E0B; --soon-soft:rgba(245,158,11,0.13);
+    --blue:#5B7FFF; --green:#34D399;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:'Segoe UI',Inter,-apple-system,sans-serif;background:var(--navy);color:var(--white);min-height:100vh;}
+  input,select,textarea{outline:none;font-family:inherit;}
+  input:focus,select:focus,textarea:focus{border-color:var(--gold)!important;box-shadow:0 0 0 3px var(--gold-glow);}
+  input[type=date]::-webkit-calendar-picker-indicator{filter:invert(0.5);cursor:pointer;}
+  ::-webkit-scrollbar{width:5px;height:5px;}::-webkit-scrollbar-thumb{background:var(--navy-border);border-radius:3px;}
+  button{font-family:inherit;}
+
+  .gold-line{height:1px;background:linear-gradient(90deg,transparent,rgba(201,168,76,0.4),transparent);}
+
+  /* Header */
+  header{background:var(--navy-mid);border-bottom:1px solid var(--navy-border);padding:0 28px;}
+  .header-row{display:flex;align-items:center;justify-content:space-between;height:64px;}
+  .brand{display:flex;align-items:center;gap:12px;}
+  .brand-icon{width:40px;height:40px;border-radius:10px;background:var(--navy-mid);display:flex;align-items:center;justify-content:center;box-shadow:0 4px 14px var(--gold-glow);flex-shrink:0;overflow:hidden;}
+  .brand-name{font-size:15px;font-weight:800;color:var(--gold);letter-spacing:0.2px;}
+  .brand-sub{font-size:10px;color:var(--text-sec);letter-spacing:0.5px;}
+  .nav-tabs{display:flex;background:var(--navy);border-radius:10px;padding:3px;gap:2px;}
+  .nav-tab{padding:7px 18px;border-radius:8px;border:none;cursor:pointer;background:transparent;color:var(--text-sec);font-size:12px;font-weight:700;transition:all .15s;}
+  .nav-tab.active{background:linear-gradient(135deg,var(--gold),var(--gold-light));color:var(--navy);}
+  .clock-box{text-align:right;}
+  .clock-time{font-size:18px;font-weight:800;color:var(--gold);letter-spacing:1px;font-variant-numeric:tabular-nums;}
+  .clock-date{font-size:10px;color:var(--text-sec);margin-top:1px;}
+  .avatar-r{width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,var(--gold),var(--gold-light));display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:var(--navy);}
+  .header-right{display:flex;align-items:center;gap:14px;}
+
+  /* Stats bar */
+  .stats-bar{background:var(--navy-mid);padding:10px 28px;display:flex;align-items:center;gap:20px;border-bottom:1px solid var(--navy-border);flex-wrap:wrap;}
+  .stat-item{display:flex;align-items:center;gap:8px;}
+  .stat-val{font-size:20px;font-weight:900;}
+  .stat-label{font-size:11px;color:var(--text-sec);}
+  .stat-divider{width:1px;height:24px;background:var(--navy-border);margin-left:12px;}
+  .date-picker-wrap{margin-left:auto;display:flex;align-items:center;gap:8px;}
+  .date-picker-wrap input{background:var(--navy-light);border:1px solid var(--navy-border);color:var(--gold);border-radius:7px;padding:5px 10px;font-size:11px;font-weight:600;}
+
+  main{padding:24px 28px;max-width:1400px;margin:0 auto;}
+
+  /* Room Cards */
+  .rooms-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:18px;margin-bottom:28px;}
+  .room-card{background:var(--navy-mid);border-radius:18px;border:1px solid var(--navy-border);overflow:hidden;transition:transform .15s;}
+  .room-card-top{height:3px;}
+  .room-card-body{padding:20px 22px;}
+  .room-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;}
+  .floor-badge{font-size:10px;font-weight:800;color:var(--gold);background:var(--gold-soft);padding:3px 10px;border-radius:20px;letter-spacing:1px;text-transform:uppercase;display:inline-block;margin-bottom:8px;}
+  .room-title{font-size:18px;font-weight:800;}
+  .room-cap{font-size:11px;color:var(--text-sec);margin-top:2px;}
+  .status-orb{width:52px;height:52px;border-radius:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0;border:2px solid;}
+  .status-orb-dot{width:18px;height:18px;border-radius:50%;}
+  .status-pill{display:inline-flex;align-items:center;gap:5px;border-radius:20px;padding:4px 10px;font-size:11px;font-weight:700;}
+  .status-dot{width:6px;height:6px;border-radius:50%;}
+  .booking-info{margin-top:14px;margin-bottom:14px;min-height:46px;}
+  .booking-info-box{border-radius:8px;padding:8px 12px;border-left:3px solid;}
+  .booking-info-title{font-size:12px;font-weight:700;margin-bottom:2px;}
+  .booking-info-meta{font-size:11px;color:var(--text-sec);}
+  .room-actions{display:flex;gap:6px;margin-top:12px;}
+  .btn-sm{flex:1;padding:8px;border-radius:8px;font-size:11px;font-weight:700;cursor:pointer;border:none;}
+  .btn-secondary{background:var(--navy-light);border:1px solid var(--navy-border);color:var(--text-sec);}
+  .btn-gold{background:linear-gradient(135deg,var(--gold),var(--gold-light));color:var(--navy);}
+  .btn-disabled{background:var(--navy-light);color:var(--text-muted);cursor:not-allowed;}
+
+  /* All bookings panel */
+  .panel{background:var(--navy-mid);border-radius:16px;border:1px solid var(--navy-border);overflow:hidden;}
+  .panel-head{padding:16px 22px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--navy-border);flex-wrap:wrap;gap:10px;}
+  .panel-title{font-size:14px;font-weight:800;color:var(--gold);}
+  .panel-controls{display:flex;gap:8px;}
+  .panel-controls select,.panel-controls input{background:var(--navy-light);border:1px solid var(--navy-border);color:var(--text-sec);border-radius:7px;padding:5px 10px;font-size:11px;}
+  .panel-controls input{color:var(--white);width:140px;}
+  .booking-row{display:flex;align-items:center;gap:14px;padding:13px 22px;border-bottom:1px solid rgba(30,58,110,0.2);cursor:pointer;transition:background .1s;}
+  .booking-row:hover{background:rgba(255,255,255,0.02);}
+  .booking-row:last-child{border-bottom:none;}
+  .booking-time{min-width:70px;text-align:center;}
+  .booking-time-start{font-size:14px;font-weight:800;color:var(--gold);}
+  .booking-time-end{font-size:9px;color:var(--text-muted);}
+  .row-divider{width:1px;height:32px;background:var(--navy-border);}
+  .floor-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+  .booking-row-info{flex:1;}
+  .booking-row-title{font-size:13px;font-weight:700;}
+  .booking-row-meta{font-size:11px;color:var(--text-sec);margin-top:1px;}
+  .row-avatar{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:var(--navy);flex-shrink:0;}
+  .empty-state{padding:40px;text-align:center;color:var(--text-muted);font-size:13px;}
+
+  /* Schedule (timeline) */
+  .timeline-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;flex-wrap:wrap;gap:10px;}
+  .timeline-title{font-size:15px;font-weight:800;color:var(--gold);}
+  .legend{display:flex;gap:14px;flex-wrap:wrap;}
+  .legend-item{font-size:11px;color:var(--text-sec);display:flex;align-items:center;gap:5px;}
+  .timeline-table{background:var(--navy-mid);border-radius:14px;border:1px solid var(--navy-border);overflow:hidden;}
+  .timeline-row{display:grid;grid-template-columns:80px repeat(2,1fr);border-bottom:1px solid rgba(30,58,110,0.15);}
+  .timeline-row:last-child{border-bottom:none;}
+  .timeline-row.header-row{border-bottom:1px solid var(--navy-border);}
+  .timeline-cell-time{padding:8px 14px;font-size:11px;color:var(--text-muted);display:flex;align-items:center;gap:4px;}
+  .timeline-cell-time.now{color:var(--gold);font-weight:700;}
+  .timeline-head-cell{padding:10px 14px;border-left:1px solid var(--navy-border);}
+  .timeline-head-room{font-size:11px;font-weight:800;}
+  .timeline-head-sub{font-size:10px;color:var(--text-sec);}
+  .timeline-cell{padding:5px 8px;border-left:1px solid rgba(30,58,110,0.15);min-height:40px;display:flex;align-items:center;}
+  .timeline-booking{width:100%;border-radius:7px;padding:5px 9px;cursor:pointer;border-left:3px solid;}
+  .timeline-booking-title{font-size:10px;font-weight:700;}
+  .timeline-booking-time{font-size:9px;color:var(--text-sec);}
+  .timeline-continued{width:100%;height:24px;border-radius:5px;}
+  .timeline-add{width:100%;height:24px;border-radius:5px;cursor:pointer;display:flex;align-items:center;padding-left:5px;opacity:0;transition:opacity .15s;}
+  .timeline-cell:hover .timeline-add{opacity:0.6;}
+  .timeline-add span{font-size:9px;color:var(--text-muted);}
+
+  /* Book Room form */
+  .book-wrap{max-width:540px;margin:0 auto;}
+  .book-title{font-size:15px;font-weight:800;color:var(--gold);margin-bottom:20px;}
+  .book-card{background:var(--navy-mid);border-radius:18px;border:1px solid var(--navy-border);padding:24px;}
+  .field-label{display:block;font-size:10px;font-weight:700;color:var(--text-muted);letter-spacing:0.9px;text-transform:uppercase;margin-bottom:6px;}
+  .field-input{width:100%;background:var(--navy-light);border:1px solid var(--navy-border);border-radius:9px;padding:9px 13px;color:var(--white);font-size:13px;}
+  .field-group{margin-bottom:14px;}
+  .field-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;}
+  .room-select-item{padding:12px 16px;border-radius:11px;cursor:pointer;border:2px solid var(--navy-border);background:var(--navy-light);display:flex;align-items:center;justify-content:space-between;transition:all .12s;margin-bottom:7px;}
+  .room-select-item.selected{background:rgba(201,168,76,0.1);}
+  .room-select-left{display:flex;align-items:center;gap:10px;}
+  .room-select-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
+  .room-select-name{font-size:12px;font-weight:700;}
+  .room-select-meta{font-size:10px;color:var(--text-sec);margin-top:1px;}
+  .duration-chips{display:flex;gap:6px;flex-wrap:wrap;}
+  .duration-chip{padding:6px 12px;border-radius:7px;border:1.5px solid var(--navy-border);background:var(--navy-light);color:var(--text-sec);font-size:11px;font-weight:600;cursor:pointer;}
+  .duration-chip.selected{border-color:var(--gold);background:var(--gold-soft);color:var(--gold);}
+  .form-actions{display:flex;gap:8px;margin-top:18px;}
+  .btn-lg{flex:1;padding:12px;border-radius:10px;font-size:12px;font-weight:700;cursor:pointer;border:none;}
+  .btn-lg.confirm{flex:2;background:linear-gradient(135deg,var(--gold),var(--gold-light));color:var(--navy);font-size:13px;font-weight:800;box-shadow:0 5px 18px var(--gold-glow);}
+
+  /* Modal */
+  .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.75);backdrop-filter:blur(8px);display:none;align-items:center;justify-content:center;z-index:1000;padding:20px;}
+  .modal-overlay.show{display:flex;}
+  .modal-box{background:var(--navy-mid);border:1px solid var(--navy-border);border-radius:18px;padding:26px;width:100%;max-width:420px;box-shadow:0 24px 60px rgba(0,0,0,0.6);}
+  .modal-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:18px;}
+  .modal-title{font-size:18px;font-weight:800;}
+  .modal-sub{font-size:11px;color:var(--gold);margin-top:2px;}
+  .modal-close{background:var(--navy-light);border:none;color:var(--text-sec);width:30px;height:30px;border-radius:7px;cursor:pointer;font-size:12px;font-weight:700;}
+  .modal-rows{margin-top:16px;display:flex;flex-direction:column;gap:11px;}
+  .modal-row{display:flex;align-items:center;gap:11px;}
+  .modal-row-icon{font-size:15px;width:20px;}
+  .modal-row-label{font-size:10px;color:var(--text-muted);width:64px;flex-shrink:0;}
+  .modal-row-val{font-size:12px;font-weight:600;}
+  .modal-actions{display:flex;gap:8px;margin-top:22px;}
+
+  /* Toast */
+  .toast{position:fixed;bottom:28px;left:50%;transform:translateX(-50%);padding:12px 24px;border-radius:12px;font-size:12px;font-weight:700;box-shadow:0 8px 30px rgba(0,0,0,0.5);z-index:9999;display:none;}
+  .toast.show{display:block;animation:su .2s ease;}
+  .toast.success{background:var(--gold);color:var(--navy);}
+  .toast.error{background:var(--occupied);color:#fff;}
+  @keyframes su{from{opacity:0;transform:translateX(-50%) translateY(10px);}to{opacity:1;transform:translateX(-50%) translateY(0);}}
+
+  .tab-content{display:none;}
+  .tab-content.active{display:block;}
+
+  @media (max-width: 900px){
+    .rooms-grid{grid-template-columns:1fr;}
+    .timeline-row{grid-template-columns:60px repeat(2,1fr);}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-row">
+    <div class="brand">
+      <div class="brand-icon" style="padding:5px;background:var(--navy);box-shadow:0 4px 14px var(--gold-glow);border:1px solid var(--gold);">
+        <img src="data:image/png;base64,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" alt="ICP Logo" style="width:100%;height:100%;object-fit:contain;border-radius:6px;">
+      </div>
+      <div>
+        <div class="brand-name">Indian City Properties</div>
+        <div class="brand-sub">Admin Dashboard</div>
+      </div>
+    </div>
+    <div class="nav-tabs">
+      <button class="nav-tab active" data-tab="overview">Overview</button>
+      <button class="nav-tab" data-tab="schedule">Schedule</button>
+      <button class="nav-tab" data-tab="book">Book Room</button>
+    </div>
+    <div class="header-right">
+      <div class="clock-box">
+        <div class="clock-time" id="clockTime">00:00:00</div>
+        <div class="clock-date" id="clockDate">-</div>
+      </div>
+      <div class="avatar-r">R</div>
+    </div>
+  </div>
+  <div class="gold-line"></div>
+</header>
+
+<div class="stats-bar">
+  <div class="stat-item"><span class="stat-val" id="statTotal" style="color:var(--gold)">2</span><span class="stat-label">Total Rooms</span></div>
+  <div class="stat-divider"></div>
+  <div class="stat-item"><span class="stat-val" id="statFree" style="color:var(--free)">0</span><span class="stat-label">Available</span></div>
+  <div class="stat-divider"></div>
+  <div class="stat-item"><span class="stat-val" id="statOcc" style="color:var(--occupied)">0</span><span class="stat-label">In Use</span></div>
+  <div class="stat-divider"></div>
+  <div class="stat-item"><span class="stat-val" id="statToday" style="color:var(--gold-light)">0</span><span class="stat-label">Today's Bookings</span></div>
+  <div class="date-picker-wrap">
+    <span style="font-size:11px;color:var(--text-sec)">Viewing:</span>
+    <input type="date" id="dateFilter">
+  </div>
+</div>
+
+<main>
+  <!-- OVERVIEW TAB -->
+  <div class="tab-content active" id="tab-overview">
+    <div class="rooms-grid" id="roomsGrid"></div>
+    <div class="panel">
+      <div class="panel-head">
+        <div class="panel-title" id="bookingsPanelTitle">All Bookings — Today</div>
+        <div class="panel-controls">
+          <select id="floorFilter">
+            <option value="all">All Floors</option>
+            <option value="mfloor">M-Floor</option>
+            <option value="floor2">2nd Floor</option>
+          </select>
+          <input type="text" id="searchBox" placeholder="Search...">
+        </div>
+      </div>
+      <div id="bookingsList"></div>
+    </div>
+  </div>
+
+  <!-- SCHEDULE TAB -->
+  <div class="tab-content" id="tab-schedule">
+    <div class="timeline-head">
+      <div class="timeline-title" id="timelineTitle">Room Timeline</div>
+      <div class="legend">
+        <span class="legend-item"><span class="legend-dot" style="width:8px;height:8px;border-radius:50%;background:var(--gold);display:inline-block;"></span>M-Floor</span>
+        <span class="legend-item"><span class="legend-dot" style="width:8px;height:8px;border-radius:50%;background:var(--blue);display:inline-block;"></span>2nd Floor</span>
+      </div>
+    </div>
+    <div class="timeline-table" id="timelineTable"></div>
+  </div>
+
+  <!-- BOOK ROOM TAB -->
+  <div class="tab-content" id="tab-book">
+    <div class="book-wrap">
+      <div class="book-title">Book a Meeting Room</div>
+      <div class="book-card">
+        <div class="field-group">
+          <label class="field-label">Select Room</label>
+          <div id="roomSelectList"></div>
+        </div>
+        <div class="field-row">
+          <div>
+            <label class="field-label">Date</label>
+            <input type="date" id="formDate" class="field-input">
+          </div>
+          <div>
+            <label class="field-label">Start Time</label>
+            <select id="formStart" class="field-input"></select>
+          </div>
+        </div>
+        <div class="field-group">
+          <label class="field-label">Duration</label>
+          <div class="duration-chips" id="durationChips"></div>
+        </div>
+        <div class="field-group">
+          <label class="field-label">Meeting Title *</label>
+          <input type="text" id="formTitle" class="field-input" placeholder="e.g. Quarterly Review">
+        </div>
+        <div class="field-row">
+          <div>
+            <label class="field-label">Organizer Name *</label>
+            <input type="text" id="formHost" class="field-input" placeholder="e.g. Rajesh K.">
+          </div>
+          <div>
+            <label class="field-label">Department *</label>
+            <input type="text" id="formDept" class="field-input" placeholder="e.g. Sales">
+          </div>
+        </div>
+        <div class="field-group">
+          <label class="field-label">Purpose / Agenda</label>
+          <textarea id="formPurpose" class="field-input" rows="2" placeholder="Brief agenda..." style="resize:none;"></textarea>
+        </div>
+        <div class="gold-line"></div>
+        <div class="form-actions">
+          <button class="btn-lg btn-secondary" id="cancelFormBtn">Cancel</button>
+          <button class="btn-lg confirm" id="confirmBookingBtn">Confirm Booking</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<!-- Booking Detail Modal -->
+<div class="modal-overlay" id="bookingModal">
+  <div class="modal-box">
+    <div class="modal-head">
+      <div>
+        <div class="modal-title" id="modalTitle"></div>
+        <div class="modal-sub" id="modalSub"></div>
+      </div>
+      <button class="modal-close" id="modalCloseBtn">✕</button>
+    </div>
+    <div class="gold-line"></div>
+    <div class="modal-rows" id="modalRows"></div>
+    <div class="modal-actions">
+      <button class="btn-lg btn-secondary" id="modalCloseBtn2">Close</button>
+      <button class="btn-lg" id="modalCancelBookingBtn" style="background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);color:var(--occupied);">Cancel Booking</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ============================================================
+   ICP RECEPTION ADMIN DASHBOARD
+   Configuration: 8AM-8PM, Mon-Fri, 30-min slots, 1 week advance
+   Data layer: swap loadBookings/saveBooking with SharePoint REST
+   calls (see comments marked SHAREPOINT INTEGRATION POINT)
+   ============================================================ */
+
+const ROOMS = [
+  { id:"mfloor", floor:"M-Floor",   capacity:10, amenities:["Projector","Whiteboard","Video Conf"], color:"var(--gold)", colorHex:"#C9A84C" },
+  { id:"floor2", floor:"2nd Floor", capacity:8,  amenities:["TV Screen","Whiteboard","WiFi"],         color:"var(--blue)", colorHex:"#5B7FFF" },
+];
+
+const WORK_START = 8, WORK_END = 20, SLOT_MIN = 30;
+
+function pad(n){return String(n).padStart(2,"0");}
+function todayStr(){const d=new Date();return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;}
+function timeToMins(t){const[h,m]=t.split(":").map(Number);return h*60+m;}
+function minsToTime(m){return `${pad(Math.floor(m/60))}:${pad(m%60)}`;}
+function fmt12(t){ // "HH:MM" (24h) -> "h:MM AM/PM" for display only; internal storage stays 24h
+  const [h,m] = t.split(":").map(Number);
+  const period = h>=12 ? "PM" : "AM";
+  let h12 = h % 12; if(h12===0) h12=12;
+  return `${h12}:${pad(m)} ${period}`;
+}
+const TODAY = todayStr();
+
+const TIMES = [];
+for(let m = WORK_START*60; m < WORK_END*60; m += SLOT_MIN) TIMES.push(minsToTime(m));
+
+const DURATIONS = ["30 min","1 hour","1.5 hours","2 hours","2.5 hours","3 hours"];
+function durationToMins(d){return {"30 min":30,"1 hour":60,"1.5 hours":90,"2 hours":120,"2.5 hours":150,"3 hours":180}[d]||30;}
+
+/* ── DATA LAYER — SharePoint REST API ────────────────────────
+   Reads/writes directly to the RoomBookings SharePoint list.
+   Must be hosted on/opened within the SharePoint site so the
+   browser sends along the user's SharePoint auth cookie. */
+const SP_SITE_URL = "https://indiancityproperties.sharepoint.com/sites/UDMS/red/IT";
+const SP_LIST_NAME = "RoomBookings";
+
+const ROOMFLOOR_TO_ROOMID = { "M-Floor": "mfloor", "2nd Floor": "floor2" };
+const ROOMID_TO_ROOMFLOOR = { mfloor: "M-Floor", floor2: "2nd Floor" };
+
+function spItemToBooking(item){
+  return {
+    id: item.Id,
+    roomId: ROOMFLOOR_TO_ROOMID[item.RoomFloor] || "mfloor",
+    date: item.BookingDate ? item.BookingDate.split("T")[0] : TODAY,
+    start: item.StartTime || "09:00",
+    end: item.EndTime || "10:00",
+    title: item.Title || "(No title)",
+    host: item.HostName || "Unknown",
+    dept: item.Department || "",
+    purpose: item.Purpose || "",
+    status: (item.Status || "Confirmed").toLowerCase(),
+  };
+}
+
+async function getRequestDigest(){
+  const res = await fetch(`${SP_SITE_URL}/_api/contextinfo`, {
+    method: "POST",
+    headers: { "Accept": "application/json;odata=verbose" },
+  });
+  const data = await res.json();
+  return data.d.GetContextWebInformation.FormDigestValue;
+}
+
+async function loadBookings(){
+  try {
+    const res = await fetch(
+      `${SP_SITE_URL}/_api/web/lists/getbytitle('${SP_LIST_NAME}')/items?$top=500&$orderby=BookingDate asc,StartTime asc`,
+      { headers: { "Accept": "application/json;odata=verbose" } }
+    );
+    if(!res.ok) throw new Error("SharePoint fetch failed: " + res.status);
+    const data = await res.json();
+    return data.d.results.map(spItemToBooking);
+  } catch(err){
+    console.error("Failed to load from SharePoint:", err);
+    showToast("Could not load bookings from SharePoint", "error");
+    return [];
+  }
+}
+
+async function createBookingInSharePoint(form, end){
+  const digest = await getRequestDigest();
+  const payload = {
+    __metadata: { type: "SP.Data.RoomBookingsListItem" },
+    Title: form.title,
+    RoomFloor: ROOMID_TO_ROOMFLOOR[form.roomId],
+    BookingDate: new Date(form.date).toISOString(),
+    StartTime: form.start,
+    EndTime: end,
+    HostName: form.host,
+    Department: form.dept,
+    Purpose: form.purpose || "",
+    Status: "Confirmed",
+  };
+  const res = await fetch(`${SP_SITE_URL}/_api/web/lists/getbytitle('${SP_LIST_NAME}')/items`, {
+    method: "POST",
+    headers: {
+      "Accept": "application/json;odata=verbose",
+      "Content-Type": "application/json;odata=verbose",
+      "X-RequestDigest": digest,
+    },
+    body: JSON.stringify(payload),
+  });
+  if(!res.ok){
+    const errText = await res.text();
+    throw new Error("Create failed: " + errText);
+  }
+  return res.json();
+}
+
+async function cancelBookingInSharePoint(itemId){
+  const digest = await getRequestDigest();
+  const res = await fetch(`${SP_SITE_URL}/_api/web/lists/getbytitle('${SP_LIST_NAME}')/items(${itemId})`, {
+    method: "POST",
+    headers: {
+      "Accept": "application/json;odata=verbose",
+      "Content-Type": "application/json;odata=verbose",
+      "X-RequestDigest": digest,
+      "X-HTTP-Method": "MERGE",
+      "If-Match": "*",
+    },
+    body: JSON.stringify({ __metadata: { type: "SP.Data.RoomBookingsListItem" }, Status: "Cancelled" }),
+  });
+  if(!res.ok){
+    const errText = await res.text();
+    throw new Error("Cancel failed: " + errText);
+  }
+}
+
+let bookings = [];
+let viewDate = TODAY;
+let activeTab = "overview";
+let bookingForm = { roomId:"mfloor", date: TODAY, start:"09:00", duration:"30 min", title:"", host:"", dept:"", purpose:"" };
+let currentModalBookingId = null;
+let isLoading = true;
+
+
+/* ── Clock ── */
+function tickClock(){
+  const d = new Date();
+  let h = d.getHours();
+  const period = h>=12 ? "PM" : "AM";
+  let h12 = h % 12; if(h12===0) h12=12;
+  document.getElementById("clockTime").textContent = `${h12}:${pad(d.getMinutes())}:${pad(d.getSeconds())} ${period}`;
+  document.getElementById("clockDate").textContent = d.toLocaleDateString("en-IN",{weekday:"short",day:"2-digit",month:"short",year:"numeric"});
+}
+tickClock(); setInterval(tickClock, 1000);
+
+/* ── Room status calc ── */
+function getRoomStatus(roomId, dateStr){
+  const now = new Date();
+  const nowMins = now.getHours()*60+now.getMinutes();
+  const isToday = dateStr === TODAY;
+  const list = bookings.filter(b=>b.roomId===roomId && b.date===dateStr && b.status==="confirmed");
+  if(isToday){
+    for(const b of list){
+      const s=timeToMins(b.start), e=timeToMins(b.end);
+      if(nowMins>=s && nowMins<e) return {status:"occupied", booking:b, minutesLeft:e-nowMins};
+      if(nowMins<s && s-nowMins<=30) return {status:"soon", booking:b, minsUntil:s-nowMins};
+    }
+  }
+  const next = list.filter(b=> !isToday || timeToMins(b.start)>nowMins).sort((a,b)=>timeToMins(a.start)-timeToMins(b.start))[0];
+  return {status:"free", nextBooking:next};
+}
+
+/* ── Toast ── */
+function showToast(msg, type){
+  const t = document.getElementById("toast");
+  t.textContent = (type==="error"?"⚠️ ":"✓ ") + msg;
+  t.className = "toast show " + type;
+  setTimeout(()=>{ t.className = "toast " + type; }, 3000);
+}
+
+/* ── Render: Room Cards ── */
+function renderRoomCards(){
+  const grid = document.getElementById("roomsGrid");
+  if(isLoading){
+    grid.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:60px;color:var(--text-sec);font-size:13px;">Loading rooms from SharePoint...</div>`;
+    return;
+  }
+  grid.innerHTML = "";
+  let freeCount=0, occCount=0;
+
+  ROOMS.forEach(room=>{
+    const rs = getRoomStatus(room.id, viewDate);
+    if(rs.status==="free") freeCount++;
+    if(rs.status==="occupied") occCount++;
+    const isOcc = rs.status==="occupied", isFree = rs.status==="free", isSoon = rs.status==="soon";
+    const statusColor = isOcc?"var(--occupied)":isSoon?"var(--soon)":"var(--free)";
+    const statusColorHex = isOcc?"#EF4444":isSoon?"#F59E0B":"#22C55E";
+    const statusBg = isOcc?"var(--occ-soft)":isSoon?"var(--soon-soft)":"var(--free-soft)";
+    const statusLabel = isOcc ? (rs.booking? `Free at ${fmt12(rs.booking.end)}`:"Occupied") : isSoon ? (rs.booking?`Starts ${fmt12(rs.booking.start)}`:"Soon") : "Available";
+
+    let infoHtml = "";
+    if(isOcc && rs.booking){
+      infoHtml = `<div class="booking-info-box" style="background:var(--occ-soft);border-left-color:var(--occupied)">
+        <div class="booking-info-title" style="color:var(--white)">${esc(rs.booking.title)}</div>
+        <div class="booking-info-meta">${fmt12(rs.booking.start)}–${fmt12(rs.booking.end)} · ${esc(rs.booking.host)}</div>
+      </div>`;
+    } else if(isSoon && rs.booking){
+      infoHtml = `<div class="booking-info-box" style="background:var(--soon-soft);border-left-color:var(--soon)">
+        <div class="booking-info-title" style="color:var(--white)">${esc(rs.booking.title)}</div>
+        <div class="booking-info-meta">Starts at ${fmt12(rs.booking.start)}</div>
+      </div>`;
+    } else if(isFree){
+      infoHtml = rs.nextBooking
+        ? `<div style="font-size:12px;color:var(--text-sec)">Next: ${esc(rs.nextBooking.title)} at ${fmt12(rs.nextBooking.start)}</div>`
+        : `<div style="font-size:12px;color:var(--free);font-weight:600">Free all day</div>`;
+    }
+
+    const card = document.createElement("div");
+    card.className = "room-card";
+    card.innerHTML = `
+      <div class="room-card-top" style="background:${isOcc?'var(--occupied)':isSoon?'var(--soon)':'linear-gradient(90deg,var(--gold),var(--gold-light))'}"></div>
+      <div class="room-card-body">
+        <div class="room-head">
+          <div>
+            <div class="floor-badge">${room.floor}</div>
+            <div class="room-title">Meeting Room</div>
+            </div>
+          <div class="status-orb" style="background:${statusBg};border-color:${statusColor}">
+            <div class="status-orb-dot" style="background:${statusColor};box-shadow:0 0 10px ${statusColorHex}"></div>
+          </div>
+        </div>
+        <span class="status-pill" style="background:${statusBg};color:${statusColor}">
+          <span class="status-dot" style="background:${statusColor};box-shadow:0 0 5px ${statusColorHex}"></span>
+          ${statusLabel}
+        </span>
+        <div class="booking-info">${infoHtml}</div>
+        <div class="gold-line"></div>
+        <div class="room-actions">
+          <button class="btn-sm btn-secondary" data-action="schedule">Schedule</button>
+          <button class="btn-sm ${isFree?'btn-gold':'btn-disabled'}" data-action="book" data-room="${room.id}" ${isFree?'':'disabled'}>${isFree?'Book Now':'Occupied'}</button>
+        </div>
+      </div>`;
+    card.querySelector('[data-action="schedule"]').onclick = ()=> switchTab("schedule");
+    const bookBtn = card.querySelector('[data-action="book"]');
+    if(isFree){
+      bookBtn.onclick = ()=>{ bookingForm.roomId = room.id; switchTab("book"); };
+    }
+    grid.appendChild(card);
+  });
+
+  document.getElementById("statFree").textContent = freeCount;
+  document.getElementById("statOcc").textContent = occCount;
+  document.getElementById("statToday").textContent = bookings.filter(b=>b.date===TODAY && b.status==="confirmed").length;
+}
+
+function esc(s){ const d=document.createElement("div"); d.textContent = s||""; return d.innerHTML; }
+
+/* ── Render: Bookings List ── */
+function renderBookingsList(){
+  const floorFilter = document.getElementById("floorFilter").value;
+  const search = document.getElementById("searchBox").value.toLowerCase();
+  document.getElementById("bookingsPanelTitle").textContent = `All Bookings — ${viewDate===TODAY?"Today":viewDate}`;
+
+  let list = bookings
+    .filter(b=>b.date===viewDate && b.status==="confirmed")
+    .filter(b=> floorFilter==="all" || b.roomId===floorFilter)
+    .filter(b=> !search || b.title.toLowerCase().includes(search) || b.host.toLowerCase().includes(search))
+    .sort((a,b)=>a.start.localeCompare(b.start));
+
+  const container = document.getElementById("bookingsList");
+  if(list.length===0){
+    container.innerHTML = `<div class="empty-state">No bookings found</div>`;
+    return;
+  }
+  container.innerHTML = list.map(b=>{
+    const room = ROOMS.find(r=>r.id===b.roomId);
+    return `<div class="booking-row" data-id="${b.id}">
+      <div class="booking-time">
+        <div class="booking-time-start">${fmt12(b.start)}</div>
+        <div class="booking-time-end">to ${fmt12(b.end)}</div>
+      </div>
+      <div class="row-divider"></div>
+      <div class="floor-dot" style="background:${room.colorHex}"></div>
+      <div class="booking-row-info">
+        <div class="booking-row-title">${esc(b.title)}</div>
+        <div class="booking-row-meta">${room.floor} · ${esc(b.host)} — ${esc(b.dept||"")}</div>
+      </div>
+      <div class="row-avatar" style="background:${room.colorHex}">${(b.host||"?").charAt(0).toUpperCase()}</div>
+      <span style="color:var(--text-muted);font-size:12px">›</span>
+    </div>`;
+  }).join("");
+  container.querySelectorAll(".booking-row").forEach(row=>{
+    row.onclick = ()=> openBookingModal(Number(row.dataset.id));
+  });
+}
+
+/* ── Render: Timeline ── */
+function renderTimeline(){
+  document.getElementById("timelineTitle").textContent = `Room Timeline · ${viewDate}`;
+  const table = document.getElementById("timelineTable");
+  const now = new Date(), nowMins = now.getHours()*60+now.getMinutes();
+
+  let html = `<div class="timeline-row header-row">
+    <div class="timeline-cell-time" style="font-weight:700;text-transform:uppercase;letter-spacing:0.8px;font-size:10px">Time</div>
+    ${ROOMS.map(r=>`<div class="timeline-head-cell"><div class="timeline-head-room" style="color:${r.colorHex}">${r.floor}</div><div class="timeline-head-sub">Meeting Room</div></div>`).join("")}
+  </div>`;
+
+  TIMES.forEach(time=>{
+    const isNow = viewDate===TODAY && timeToMins(time)<=nowMins && nowMins<timeToMins(time)+SLOT_MIN;
+    html += `<div class="timeline-row">
+      <div class="timeline-cell-time ${isNow?'now':''}">${fmt12(time)}</div>`;
+    ROOMS.forEach(r=>{
+      const bk = bookings.find(b=>b.roomId===r.id && b.date===viewDate && b.start===time && b.status==="confirmed");
+      const cont = bookings.find(b=>b.roomId===r.id && b.date===viewDate && b.status==="confirmed" && timeToMins(b.start)<timeToMins(time) && timeToMins(b.end)>timeToMins(time));
+      if(bk){
+        html += `<div class="timeline-cell"><div class="timeline-booking" data-id="${bk.id}" style="background:${r.colorHex}15;border:1.5px solid ${r.colorHex}44;border-left:3px solid ${r.colorHex};cursor:pointer;">
+          <div class="timeline-booking-title" style="color:${r.colorHex}">${esc(bk.title)}</div>
+          <div class="timeline-booking-time">${fmt12(bk.start)}–${fmt12(bk.end)}</div>
+        </div></div>`;
+      } else if(cont){
+        html += `<div class="timeline-cell"><div class="timeline-continued" style="background:${r.colorHex}08"></div></div>`;
+      } else {
+        html += `<div class="timeline-cell"><div class="timeline-add" data-room="${r.id}" data-time="${time}"><span>+ Book</span></div></div>`;
+      }
+    });
+    html += `</div>`;
+  });
+
+  table.innerHTML = html;
+  table.querySelectorAll(".timeline-booking").forEach(el=>{
+    el.onclick = ()=> openBookingModal(Number(el.dataset.id));
+  });
+  table.querySelectorAll(".timeline-add").forEach(el=>{
+    el.onclick = ()=>{
+      bookingForm.roomId = el.dataset.room;
+      bookingForm.date = viewDate;
+      bookingForm.start = el.dataset.time;
+      switchTab("book");
+    };
+  });
+}
+
+/* ── Render: Book Form ── */
+function renderBookForm(){
+  document.getElementById("formDate").value = bookingForm.date;
+  document.getElementById("formTitle").value = bookingForm.title;
+  document.getElementById("formHost").value = bookingForm.host;
+  document.getElementById("formDept").value = bookingForm.dept;
+  document.getElementById("formPurpose").value = bookingForm.purpose;
+
+  const startSel = document.getElementById("formStart");
+  startSel.innerHTML = TIMES.map(t=>`<option value="${t}" ${t===bookingForm.start?'selected':''}>${fmt12(t)}</option>`).join("");
+
+  const roomList = document.getElementById("roomSelectList");
+  roomList.innerHTML = ROOMS.map(r=>{
+    const rs = getRoomStatus(r.id, bookingForm.date);
+    const sel = bookingForm.roomId===r.id;
+    const statusColor = rs.status==="occupied"?"var(--occupied)":rs.status==="soon"?"var(--soon)":"var(--free)";
+    const statusColorHex = rs.status==="occupied"?"#EF4444":rs.status==="soon"?"#F59E0B":"#22C55E";
+    const statusBg = rs.status==="occupied"?"var(--occ-soft)":rs.status==="soon"?"var(--soon-soft)":"var(--free-soft)";
+    const statusLabel = rs.status==="occupied"?(rs.booking?`Free at ${fmt12(rs.booking.end)}`:"Occupied"):rs.status==="soon"?(rs.booking?`Starts ${fmt12(rs.booking.start)}`:"Soon"):"Available";
+    return `<div class="room-select-item ${sel?'selected':''}" data-room="${r.id}" style="border-color:${sel?r.colorHex:'var(--navy-border)'};background:${sel?r.colorHex+'15':'var(--navy-light)'}">
+      <div class="room-select-left">
+        <div class="room-select-dot" style="background:${r.colorHex}"></div>
+        <div>
+          <div class="room-select-name" style="color:${sel?r.colorHex:'var(--white)'}">${r.floor} — Meeting Room</div>
+          <div class="room-select-meta">${r.amenities.join(", ")}</div>
+        </div>
+      </div>
+      <span class="status-pill" style="background:${statusBg};color:${statusColor}"><span class="status-dot" style="background:${statusColor};box-shadow:0 0 5px ${statusColorHex}"></span>${statusLabel}</span>
+    </div>`;
+  }).join("");
+  roomList.querySelectorAll(".room-select-item").forEach(el=>{
+    el.onclick = ()=>{ bookingForm.roomId = el.dataset.room; renderBookForm(); };
+  });
+
+  const chips = document.getElementById("durationChips");
+  chips.innerHTML = DURATIONS.map(d=>`<div class="duration-chip ${bookingForm.duration===d?'selected':''}" data-d="${d}">${d}</div>`).join("");
+  chips.querySelectorAll(".duration-chip").forEach(el=>{
+    el.onclick = ()=>{ bookingForm.duration = el.dataset.d; renderBookForm(); };
+  });
+}
+
+/* ── Modal ── */
+function openBookingModal(id){
+  const b = bookings.find(x=>x.id===id);
+  if(!b) return;
+  currentModalBookingId = id;
+  const room = ROOMS.find(r=>r.id===b.roomId);
+  document.getElementById("modalTitle").textContent = b.title;
+  document.getElementById("modalSub").textContent = `${room.floor} · Meeting Room`;
+  document.getElementById("modalRows").innerHTML = `
+    <div class="modal-row"><span class="modal-row-icon">📅</span><span class="modal-row-label">Date</span><span class="modal-row-val">${b.date}</span></div>
+    <div class="modal-row"><span class="modal-row-icon">🕐</span><span class="modal-row-label">Time</span><span class="modal-row-val">${fmt12(b.start)} – ${fmt12(b.end)}</span></div>
+    <div class="modal-row"><span class="modal-row-icon">👤</span><span class="modal-row-label">Organizer</span><span class="modal-row-val">${esc(b.host)} — ${esc(b.dept||"")}</span></div>
+    <div class="modal-row"><span class="modal-row-icon">📋</span><span class="modal-row-label">Purpose</span><span class="modal-row-val">${esc(b.purpose)||"—"}</span></div>
+  `;
+  document.getElementById("bookingModal").classList.add("show");
+}
+function closeModal(){ document.getElementById("bookingModal").classList.remove("show"); currentModalBookingId=null; }
+
+document.getElementById("modalCloseBtn").onclick = closeModal;
+document.getElementById("modalCloseBtn2").onclick = closeModal;
+document.getElementById("bookingModal").onclick = (e)=>{ if(e.target.id==="bookingModal") closeModal(); };
+document.getElementById("modalCancelBookingBtn").onclick = async ()=>{
+  if(currentModalBookingId==null) return;
+  try {
+    await cancelBookingInSharePoint(currentModalBookingId);
+    bookings = bookings.filter(b=>b.id!==currentModalBookingId);
+    closeModal();
+    showToast("Booking cancelled", "error");
+    renderAll();
+  } catch(err){
+    console.error(err);
+    showToast("Failed to cancel booking in SharePoint", "error");
+  }
+};
+
+/* ── Booking submit ── */
+document.getElementById("confirmBookingBtn").onclick = async ()=>{
+  bookingForm.date = document.getElementById("formDate").value;
+  bookingForm.start = document.getElementById("formStart").value;
+  bookingForm.title = document.getElementById("formTitle").value.trim();
+  bookingForm.host = document.getElementById("formHost").value.trim();
+  bookingForm.dept = document.getElementById("formDept").value.trim();
+  bookingForm.purpose = document.getElementById("formPurpose").value.trim();
+
+  if(!bookingForm.title){ showToast("Meeting title required","error"); return; }
+  if(!bookingForm.host){ showToast("Organizer name required","error"); return; }
+  if(!bookingForm.dept){ showToast("Department required","error"); return; }
+
+  // Validate day is Mon-Fri
+  const d = new Date(bookingForm.date+"T00:00:00");
+  const dow = d.getDay();
+  if(dow===0 || dow===6){ showToast("Bookings allowed Monday to Friday only","error"); return; }
+
+  // Validate within 1 week advance
+  const maxDate = new Date(); maxDate.setDate(maxDate.getDate()+7);
+  if(d > maxDate){ showToast("Bookings allowed up to 1 week in advance","error"); return; }
+
+  const sM = timeToMins(bookingForm.start);
+  const dur = durationToMins(bookingForm.duration);
+  const eM = sM + dur;
+  if(eM > WORK_END*60){ showToast(`Meeting must end by ${fmt12(minsToTime(WORK_END*60))}`,"error"); return; }
+  const end = minsToTime(eM);
+
+  // Re-fetch latest bookings right before conflict check to minimize race conditions
+  // with Outlook/Teams bookings landing via Power Automate at the same time.
+  const latest = await loadBookings();
+  const conflict = latest.find(b=> b.roomId===bookingForm.roomId && b.date===bookingForm.date && b.status==="confirmed" &&
+    !(eM<=timeToMins(b.start) || sM>=timeToMins(b.end)));
+  if(conflict){ showToast(`Conflict: ${fmt12(conflict.start)}–${fmt12(conflict.end)} already booked`,"error"); bookings = latest; renderAll(); return; }
+
+  try {
+    await createBookingInSharePoint(bookingForm, end);
+    showToast("Room booked successfully!");
+    viewDate = bookingForm.date;
+    document.getElementById("dateFilter").value = viewDate;
+    bookingForm = { roomId:"mfloor", date: TODAY, start:"09:00", duration:"30 min", title:"", host:"", dept:"", purpose:"" };
+    bookings = await loadBookings();
+    switchTab("overview");
+  } catch(err){
+    console.error(err);
+    showToast("Failed to save booking to SharePoint","error");
+  }
+};
+
+document.getElementById("cancelFormBtn").onclick = ()=> switchTab("overview");
+
+/* ── Tabs ── */
+function switchTab(tab){
+  activeTab = tab;
+  document.querySelectorAll(".nav-tab").forEach(b=> b.classList.toggle("active", b.dataset.tab===tab));
+  document.querySelectorAll(".tab-content").forEach(c=> c.classList.toggle("active", c.id==="tab-"+tab));
+  renderAll();
+}
+document.querySelectorAll(".nav-tab").forEach(b=>{ b.onclick = ()=> switchTab(b.dataset.tab); });
+
+/* ── Filters ── */
+document.getElementById("dateFilter").value = TODAY;
+document.getElementById("dateFilter").onchange = (e)=>{ viewDate = e.target.value; renderAll(); };
+document.getElementById("floorFilter").onchange = renderBookingsList;
+document.getElementById("searchBox").oninput = renderBookingsList;
+
+/* ── Render dispatcher ── */
+function renderAll(){
+  renderRoomCards();
+  if(activeTab==="overview") renderBookingsList();
+  if(activeTab==="schedule") renderTimeline();
+  if(activeTab==="book") renderBookForm();
+}
+
+async function refreshFromSharePoint(){
+  bookings = await loadBookings();
+  isLoading = false;
+  renderAll();
+}
+refreshFromSharePoint();
+setInterval(refreshFromSharePoint, 30000); // auto-refresh every 30s for live status
+
+</script>
+</body>
+</html>
