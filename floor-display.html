@@ -143,19 +143,96 @@ function fmt12(t){
 }
 const TODAY = todayStr();
 
-function safeGetStorage(key){
-  try { return window.localStorage.getItem(key); }
-  catch(e){ return null; } // sandboxed iframe (e.g. SharePoint preview) blocks localStorage
+/* ── MICROSOFT GRAPH API — Read Only ─────────────────────────
+   Floor display is read-only — only fetches bookings.
+   Uses MSAL for authentication. */
+const MSAL_CONFIG = {
+  auth: {
+    clientId: "ef7f351e-a6e8-4e64-bda0-76ada332adfb",
+    authority: "https://login.microsoftonline.com/aa5f83a0-efdf-4130-a31f-9f84d5bdfcb9",
+    redirectUri: window.location.href.split('?')[0],
+  },
+  cache: { cacheLocation: "sessionStorage" }
+};
+const GRAPH_SCOPES = ["https://graph.microsoft.com/Sites.Read.All"];
+let msalInstance = null, graphSiteId = null, graphListId = null;
+
+async function initMSAL(){
+  await new Promise((resolve, reject) => {
+    if(window.msal){ resolve(); return; }
+    const s = document.createElement('script');
+    s.src = "https://alcdn.msauth.net/browser/2.38.2/js/msal-browser.min.js";
+    s.onload = resolve; s.onerror = reject;
+    document.head.appendChild(s);
+  });
+  msalInstance = new window.msal.PublicClientApplication(MSAL_CONFIG);
+  await msalInstance.initialize();
+  await msalInstance.handleRedirectPromise();
 }
-function loadBookings(){
-  const raw = safeGetStorage("icp_bookings");
-  if(raw) return JSON.parse(raw);
-  return [
-    {id:1,roomId:"mfloor",date:TODAY,start:"09:00",end:"10:00",title:"Board Meeting",host:"Rajesh K.",dept:"Management",status:"confirmed"},
-    {id:2,roomId:"floor2",date:TODAY,start:"10:00",end:"11:30",title:"Project Review",host:"Sunita P.",dept:"Operations",status:"confirmed"},
-    {id:4,roomId:"mfloor",date:TODAY,start:"14:00",end:"15:00",title:"HR Discussion",host:"Neha R.",dept:"HR",status:"confirmed"},
-  ];
+
+async function getGraphToken(){
+  const accounts = msalInstance.getAllAccounts();
+  if(accounts.length === 0){
+    await msalInstance.loginRedirect({ scopes: GRAPH_SCOPES });
+    return null;
+  }
+  try {
+    const result = await msalInstance.acquireTokenSilent({ scopes: GRAPH_SCOPES, account: accounts[0] });
+    return result.accessToken;
+  } catch(e){
+    await msalInstance.loginRedirect({ scopes: GRAPH_SCOPES });
+    return null;
+  }
 }
+
+async function graphFetch(endpoint){
+  const token = await getGraphToken();
+  if(!token) return null;
+  const res = await fetch(`https://graph.microsoft.com/v1.0${endpoint}`, {
+    headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" }
+  });
+  if(!res.ok) throw new Error(`Graph error ${res.status}`);
+  return res.json();
+}
+
+async function getListIds(){
+  if(graphSiteId && graphListId) return;
+  const site = await graphFetch(`/sites/indiancityproperties.sharepoint.com:/sites/UDMS/red/IT`);
+  graphSiteId = site.id;
+  const lists = await graphFetch(`/sites/${graphSiteId}/lists?$filter=displayName eq 'RoomBookings'`);
+  graphListId = lists.value[0].id;
+}
+
+const ROOMFLOOR_TO_ROOMID = { "M-Floor": "mfloor", "2nd Floor": "floor2" };
+
+function graphItemToBooking(item){
+  const f = item.fields;
+  return {
+    id: item.id,
+    roomId: ROOMFLOOR_TO_ROOMID[f.RoomFloor] || "mfloor",
+    date: f.BookingDate ? f.BookingDate.split("T")[0] : TODAY,
+    start: f.StartTime || "09:00",
+    end: f.EndTime || "10:00",
+    title: f.Title || "(No title)",
+    host: f.HostName || "Unknown",
+    dept: f.Department || "",
+    status: (f.Status || "Confirmed").toLowerCase(),
+  };
+}
+
+async function loadBookings(){
+  try {
+    await getListIds();
+    const data = await graphFetch(
+      `/sites/${graphSiteId}/lists/${graphListId}/items?expand=fields&$top=500`
+    );
+    return data.value.map(graphItemToBooking);
+  } catch(err){
+    console.error("Graph load failed:", err);
+    return [];
+  }
+}
+
 
 function getUrlFloor(){
   const params = new URLSearchParams(window.location.search);
@@ -310,7 +387,12 @@ demoSwitch.querySelectorAll(".demo-btn").forEach(b=>{
 updateDemoButtons();
 
 render();
-setInterval(()=>{ bookings = loadBookings(); render(); }, 30000); // auto-refresh every 30s
+// Initialize MSAL then start auto-refresh
+initMSAL().then(async ()=>{
+  bookings = await loadBookings();
+  render();
+  setInterval(async ()=>{ bookings = await loadBookings(); render(); }, 30000);
+}).catch(err => console.error("MSAL init failed:", err));
 setInterval(tickClock, 1000);
 </script>
 </body>

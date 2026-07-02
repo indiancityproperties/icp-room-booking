@@ -350,103 +350,152 @@ for(let m = WORK_START*60; m < WORK_END*60; m += SLOT_MIN) TIMES.push(minsToTime
 const DURATIONS = ["30 min","1 hour","1.5 hours","2 hours","2.5 hours","3 hours"];
 function durationToMins(d){return {"30 min":30,"1 hour":60,"1.5 hours":90,"2 hours":120,"2.5 hours":150,"3 hours":180}[d]||30;}
 
-/* ── DATA LAYER — SharePoint REST API ────────────────────────
-   Reads/writes directly to the RoomBookings SharePoint list.
-   Must be hosted on/opened within the SharePoint site so the
-   browser sends along the user's SharePoint auth cookie. */
-const SP_SITE_URL = "https://indiancityproperties.sharepoint.com/sites/UDMS/red/IT";
-const SP_LIST_NAME = "RoomBookings";
+/* ── MICROSOFT GRAPH API + MSAL AUTHENTICATION ───────────────
+   Uses MSAL.js for OAuth2 login and Microsoft Graph API to
+   read/write the RoomBookings SharePoint list.
+   Works from any domain (GitHub Pages, etc.) — no CORS issues. */
+
+const MSAL_CONFIG = {
+  auth: {
+    clientId: "ef7f351e-a6e8-4e64-bda0-76ada332adfb",
+    authority: "https://login.microsoftonline.com/aa5f83a0-efdf-4130-a31f-9f84d5bdfcb9",
+    redirectUri: window.location.href.split('?')[0],
+  },
+  cache: { cacheLocation: "sessionStorage" }
+};
+
+const GRAPH_SCOPES = ["https://graph.microsoft.com/Sites.ReadWrite.All"];
+const SITE_ID = "indiancityproperties.sharepoint.com,/sites/UDMS/red/IT";
+const LIST_NAME = "RoomBookings";
+
+let msalInstance = null;
+let graphSiteId = null;
+let graphListId = null;
+
+async function initMSAL(){
+  // Load MSAL library dynamically
+  await new Promise((resolve, reject) => {
+    if(window.msal){ resolve(); return; }
+    const s = document.createElement('script');
+    s.src = "https://alcdn.msauth.net/browser/2.38.2/js/msal-browser.min.js";
+    s.onload = resolve; s.onerror = reject;
+    document.head.appendChild(s);
+  });
+  msalInstance = new window.msal.PublicClientApplication(MSAL_CONFIG);
+  await msalInstance.initialize();
+  // Handle redirect response
+  await msalInstance.handleRedirectPromise();
+}
+
+async function getGraphToken(){
+  const accounts = msalInstance.getAllAccounts();
+  if(accounts.length === 0){
+    // No account — trigger login
+    await msalInstance.loginRedirect({ scopes: GRAPH_SCOPES });
+    return null;
+  }
+  try {
+    const result = await msalInstance.acquireTokenSilent({
+      scopes: GRAPH_SCOPES,
+      account: accounts[0]
+    });
+    return result.accessToken;
+  } catch(e){
+    // Silent failed — interactive login
+    await msalInstance.loginRedirect({ scopes: GRAPH_SCOPES });
+    return null;
+  }
+}
+
+async function graphFetch(endpoint, options = {}){
+  const token = await getGraphToken();
+  if(!token) return null;
+  const res = await fetch(`https://graph.microsoft.com/v1.0${endpoint}`, {
+    ...options,
+    headers: {
+      "Authorization": `Bearer ${token}`,
+      "Content-Type": "application/json",
+      ...(options.headers || {})
+    }
+  });
+  if(!res.ok){
+    const err = await res.text();
+    throw new Error(`Graph API error ${res.status}: ${err}`);
+  }
+  if(res.status === 204) return null;
+  return res.json();
+}
+
+async function getListIds(){
+  if(graphSiteId && graphListId) return;
+  // Get site ID
+  const site = await graphFetch(`/sites/indiancityproperties.sharepoint.com:/sites/UDMS/red/IT`);
+  graphSiteId = site.id;
+  // Get list ID
+  const lists = await graphFetch(`/sites/${graphSiteId}/lists?$filter=displayName eq '${LIST_NAME}'`);
+  graphListId = lists.value[0].id;
+}
 
 const ROOMFLOOR_TO_ROOMID = { "M-Floor": "mfloor", "2nd Floor": "floor2" };
 const ROOMID_TO_ROOMFLOOR = { mfloor: "M-Floor", floor2: "2nd Floor" };
 
-function spItemToBooking(item){
+function graphItemToBooking(item){
+  const f = item.fields;
   return {
-    id: item.Id,
-    roomId: ROOMFLOOR_TO_ROOMID[item.RoomFloor] || "mfloor",
-    date: item.BookingDate ? item.BookingDate.split("T")[0] : TODAY,
-    start: item.StartTime || "09:00",
-    end: item.EndTime || "10:00",
-    title: item.Title || "(No title)",
-    host: item.HostName || "Unknown",
-    dept: item.Department || "",
-    purpose: item.Purpose || "",
-    status: (item.Status || "Confirmed").toLowerCase(),
+    id: item.id,
+    roomId: ROOMFLOOR_TO_ROOMID[f.RoomFloor] || "mfloor",
+    date: f.BookingDate ? f.BookingDate.split("T")[0] : TODAY,
+    start: f.StartTime || "09:00",
+    end: f.EndTime || "10:00",
+    title: f.Title || "(No title)",
+    host: f.HostName || "Unknown",
+    dept: f.Department || "",
+    purpose: f.Purpose || "",
+    status: (f.Status || "Confirmed").toLowerCase(),
   };
-}
-
-async function getRequestDigest(){
-  const res = await fetch(`${SP_SITE_URL}/_api/contextinfo`, {
-    method: "POST",
-    headers: { "Accept": "application/json;odata=verbose" },
-  });
-  const data = await res.json();
-  return data.d.GetContextWebInformation.FormDigestValue;
 }
 
 async function loadBookings(){
   try {
-    const res = await fetch(
-      `${SP_SITE_URL}/_api/web/lists/getbytitle('${SP_LIST_NAME}')/items?$top=500&$orderby=BookingDate asc,StartTime asc`,
-      { headers: { "Accept": "application/json;odata=verbose" } }
+    await getListIds();
+    const data = await graphFetch(
+      `/sites/${graphSiteId}/lists/${graphListId}/items?expand=fields&$top=500&$orderby=fields/BookingDate,fields/StartTime`
     );
-    if(!res.ok) throw new Error("SharePoint fetch failed: " + res.status);
-    const data = await res.json();
-    return data.d.results.map(spItemToBooking);
+    return data.value.map(graphItemToBooking);
   } catch(err){
-    console.error("Failed to load from SharePoint:", err);
-    showToast("Could not load bookings from SharePoint", "error");
+    console.error("Failed to load from Graph:", err);
+    showToast("Could not load bookings", "error");
     return [];
   }
 }
 
 async function createBookingInSharePoint(form, end){
-  const digest = await getRequestDigest();
+  await getListIds();
   const payload = {
-    __metadata: { type: "SP.Data.RoomBookingsListItem" },
-    Title: form.title,
-    RoomFloor: ROOMID_TO_ROOMFLOOR[form.roomId],
-    BookingDate: new Date(form.date).toISOString(),
-    StartTime: form.start,
-    EndTime: end,
-    HostName: form.host,
-    Department: form.dept,
-    Purpose: form.purpose || "",
-    Status: "Confirmed",
+    fields: {
+      Title: form.title,
+      RoomFloor: ROOMID_TO_ROOMFLOOR[form.roomId],
+      BookingDate: new Date(form.date).toISOString(),
+      StartTime: form.start,
+      EndTime: end,
+      HostName: form.host,
+      Department: form.dept,
+      Purpose: form.purpose || "",
+      Status: "Confirmed",
+    }
   };
-  const res = await fetch(`${SP_SITE_URL}/_api/web/lists/getbytitle('${SP_LIST_NAME}')/items`, {
+  return graphFetch(`/sites/${graphSiteId}/lists/${graphListId}/items`, {
     method: "POST",
-    headers: {
-      "Accept": "application/json;odata=verbose",
-      "Content-Type": "application/json;odata=verbose",
-      "X-RequestDigest": digest,
-    },
-    body: JSON.stringify(payload),
+    body: JSON.stringify(payload)
   });
-  if(!res.ok){
-    const errText = await res.text();
-    throw new Error("Create failed: " + errText);
-  }
-  return res.json();
 }
 
 async function cancelBookingInSharePoint(itemId){
-  const digest = await getRequestDigest();
-  const res = await fetch(`${SP_SITE_URL}/_api/web/lists/getbytitle('${SP_LIST_NAME}')/items(${itemId})`, {
-    method: "POST",
-    headers: {
-      "Accept": "application/json;odata=verbose",
-      "Content-Type": "application/json;odata=verbose",
-      "X-RequestDigest": digest,
-      "X-HTTP-Method": "MERGE",
-      "If-Match": "*",
-    },
-    body: JSON.stringify({ __metadata: { type: "SP.Data.RoomBookingsListItem" }, Status: "Cancelled" }),
+  await getListIds();
+  return graphFetch(`/sites/${graphSiteId}/lists/${graphListId}/items/${itemId}/fields`, {
+    method: "PATCH",
+    body: JSON.stringify({ Status: "Cancelled" })
   });
-  if(!res.ok){
-    const errText = await res.text();
-    throw new Error("Cancel failed: " + errText);
-  }
 }
 
 let bookings = [];
@@ -810,8 +859,15 @@ async function refreshFromSharePoint(){
   isLoading = false;
   renderAll();
 }
-refreshFromSharePoint();
-setInterval(refreshFromSharePoint, 30000); // auto-refresh every 30s for live status
+
+// Initialize MSAL first, then load data
+initMSAL().then(()=>{
+  refreshFromSharePoint();
+  setInterval(refreshFromSharePoint, 30000);
+}).catch(err => {
+  console.error("MSAL init failed:", err);
+  showToast("Authentication failed — please refresh", "error");
+});
 
 </script>
 </body>
