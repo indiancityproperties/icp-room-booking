@@ -431,8 +431,10 @@ async function graphFetch(endpoint, options = {}){
     const err = await res.text();
     throw new Error(`Graph API error ${res.status}: ${err}`);
   }
-  if(res.status === 204) return null;
-  return res.json();
+  if(res.status === 204 || res.headers.get("content-length") === "0") return null;
+  const text = await res.text();
+  if(!text) return null;
+  return JSON.parse(text);
 }
 
 async function getListIds(){
@@ -563,7 +565,7 @@ async function searchPeople(query){
   if(query.length < 2) return [];
   try {
     const data = await graphFetch(
-      `/users?$search="displayName:${query}" OR "mail:${query}"&$select=displayName,mail,department&$top=8&$orderby=displayName`,
+      `/users?$search="displayName:${query}" OR "mail:${query}"&$select=displayName,mail,department,jobTitle&$top=8`,
       { headers: { "ConsistencyLevel": "eventual" } }
     );
     return data.value || [];
@@ -588,7 +590,10 @@ function setupPeopleSearch(){
       if(results.length === 0){ dropdown.style.display="none"; return; }
 
       dropdown.innerHTML = results.map(u=>`
-        <div class="people-item" data-name="${u.displayName||''}" data-email="${u.mail||''}" data-dept="${u.department||''}"
+        <div class="people-item" 
+          data-name="${(u.displayName||'').replace(/"/g,'&quot;')}" 
+          data-email="${(u.mail||'').replace(/"/g,'&quot;')}" 
+          data-dept="${(u.department||'').replace(/"/g,'&quot;')}"
           style="padding:10px 14px;cursor:pointer;border-bottom:1px solid var(--navy-border);display:flex;align-items:center;gap:10px;">
           <div style="width:32px;height:32px;border-radius:50%;background:var(--gold);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:var(--navy);flex-shrink:0;">
             ${(u.displayName||"?").charAt(0).toUpperCase()}
