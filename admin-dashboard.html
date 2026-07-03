@@ -491,15 +491,23 @@ async function createBookingInSharePoint(form, end){
       StartTime: form.start,
       EndTime: end,
       HostName: form.host,
-      HostEmail: form.email,
       Department: form.dept,
       Status: "Confirmed",
     }
   };
-  return graphFetch(`/sites/${graphSiteId}/lists/${graphListId}/items`, {
+  // Create item
+  const created = await graphFetch(`/sites/${graphSiteId}/lists/${graphListId}/items`, {
     method: "POST",
     body: JSON.stringify(payload)
   });
+  // PATCH HostEmail separately (Graph API POST sometimes ignores custom fields)
+  if(created && created.id && form.email){
+    await graphFetch(`/sites/${graphSiteId}/lists/${graphListId}/items/${created.id}/fields`, {
+      method: "PATCH",
+      body: JSON.stringify({ HostEmail: form.email })
+    });
+  }
+  return created;
 }
 
 async function cancelBookingInSharePoint(itemId){
