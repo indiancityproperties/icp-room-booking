@@ -460,6 +460,7 @@ function graphItemToBooking(item){
     end: f.EndTime || "10:00",
     title: f.Title || "(No title)",
     host: f.HostName || "Unknown",
+    hostEmail: f.HostEmail || "",
     dept: f.Department || "",
     purpose: f.Purpose || "",
     status: (f.Status || "Confirmed").toLowerCase(),
@@ -490,6 +491,7 @@ async function createBookingInSharePoint(form, end){
       StartTime: form.start,
       EndTime: end,
       HostName: form.host,
+      HostEmail: form.email,
       Department: form.dept,
       Status: "Confirmed",
     }
@@ -557,8 +559,50 @@ async function sendConfirmationEmail(form, end){
   }
 }
 
+async function sendCancellationEmail(booking){
+  const room = ROOMS.find(r=>r.id===booking.roomId);
+  if(!booking.host || !booking.hostEmail) return;
 
-/* ── People Search ── */
+  const emailBody = `
+    <div style="font-family:Segoe UI,sans-serif;max-width:500px;margin:0 auto;background:#0A1628;color:#ffffff;border-radius:12px;overflow:hidden;">
+      <div style="background:#112240;padding:24px;border-bottom:2px solid #EF4444;">
+        <h2 style="color:#EF4444;margin:0;">Meeting Room Booking Cancelled</h2>
+        <p style="color:#E8EAF2;margin:4px 0 0;">Indian City Properties</p>
+      </div>
+      <div style="padding:24px;">
+        <p style="color:#E8EAF2;">Dear <strong>${booking.host}</strong>,</p>
+        <p style="color:#E8EAF2;">Your meeting room booking has been <strong style="color:#EF4444;">cancelled</strong>. Details below:</p>
+        <table style="width:100%;border-collapse:collapse;margin:16px 0;">
+          <tr><td style="padding:8px;color:#A88C4A;width:120px;">Meeting Title</td><td style="padding:8px;color:#ffffff;font-weight:600;">${booking.title}</td></tr>
+          <tr style="background:#1A3460;"><td style="padding:8px;color:#A88C4A;">Room</td><td style="padding:8px;color:#ffffff;font-weight:600;">${room.floor} — Meeting Room</td></tr>
+          <tr><td style="padding:8px;color:#A88C4A;">Date</td><td style="padding:8px;color:#ffffff;font-weight:600;">${booking.date}</td></tr>
+          <tr style="background:#1A3460;"><td style="padding:8px;color:#A88C4A;">Time</td><td style="padding:8px;color:#ffffff;font-weight:600;">${fmt12(booking.start)} – ${fmt12(booking.end)}</td></tr>
+          <tr><td style="padding:8px;color:#A88C4A;">Department</td><td style="padding:8px;color:#ffffff;font-weight:600;">${booking.dept}</td></tr>
+        </table>
+        <p style="color:#E8EAF2;font-size:12px;">If you have any questions, please contact the reception desk.</p>
+        <p style="color:#E8EAF2;font-size:12px;">This is an automated notification from Indian City Properties Meeting Room System.</p>
+      </div>
+    </div>`;
+
+  const emailPayload = {
+    message: {
+      subject: `Room Booking Cancelled — ${room.floor} | ${booking.title}`,
+      body: { contentType: "HTML", content: emailBody },
+      toRecipients: [{ emailAddress: { address: booking.hostEmail } }]
+    },
+    saveToSentItems: true
+  };
+
+  try {
+    await graphFetch(`/me/sendMail`, {
+      method: "POST",
+      body: JSON.stringify(emailPayload)
+    });
+    console.log("Cancellation email sent!");
+  } catch(err){
+    console.error("Cancellation email failed:", err);
+  }
+}
 let peopleSearchTimeout = null;
 
 async function searchPeople(query){
@@ -915,14 +959,17 @@ document.getElementById("bookingModal").onclick = (e)=>{ if(e.target.id==="booki
 document.getElementById("modalCancelBookingBtn").onclick = async ()=>{
   if(currentModalBookingId==null) return;
   try {
+    const booking = bookings.find(b=>b.id===currentModalBookingId);
     await cancelBookingInSharePoint(currentModalBookingId);
+    // Send cancellation email
+    if(booking) await sendCancellationEmail(booking);
     bookings = bookings.filter(b=>b.id!==currentModalBookingId);
     closeModal();
-    showToast("Booking cancelled", "error");
+    showToast("Booking cancelled — email sent", "error");
     renderAll();
   } catch(err){
     console.error(err);
-    showToast("Failed to cancel booking in SharePoint", "error");
+    showToast("Failed to cancel booking", "error");
   }
 };
 
