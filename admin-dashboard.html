@@ -706,18 +706,33 @@ function renderTimeline(){
 
 /* ── Render: Book Form ── */
 function renderBookForm(){
-  document.getElementById("formDate").value = bookingForm.date;
-  document.getElementById("formTitle").value = bookingForm.title;
-  document.getElementById("formHost").value = bookingForm.host;
-  document.getElementById("formDept").value = bookingForm.dept;
-  document.getElementById("formPurpose").value = bookingForm.purpose;
+  // Only set values if field is empty or on first render (don't overwrite user typing)
+  const formDate = document.getElementById("formDate");
+  const formTitle = document.getElementById("formTitle");
+  const formHost = document.getElementById("formHost");
+  const formDept = document.getElementById("formDept");
+  const formPurpose = document.getElementById("formPurpose");
+
+  if(!formDate.dataset.userSet) formDate.value = bookingForm.date;
+  if(!formTitle.dataset.userSet) formTitle.value = bookingForm.title;
+  if(!formHost.dataset.userSet) formHost.value = bookingForm.host;
+  if(!formDept.dataset.userSet) formDept.value = bookingForm.dept;
+  if(!formPurpose.dataset.userSet) formPurpose.value = bookingForm.purpose;
+
+  // Mark fields as user-set when user types
+  [formDate, formTitle, formHost, formDept, formPurpose].forEach(el=>{
+    el.oninput = ()=>{ el.dataset.userSet = "1"; };
+    el.onchange = ()=>{ el.dataset.userSet = "1"; };
+  });
 
   const startSel = document.getElementById("formStart");
-  startSel.innerHTML = TIMES.map(t=>`<option value="${t}" ${t===bookingForm.start?'selected':''}>${fmt12(t)}</option>`).join("");
+  const currentStart = startSel.value || bookingForm.start;
+  startSel.innerHTML = TIMES.map(t=>`<option value="${t}" ${t===currentStart?'selected':''}>${fmt12(t)}</option>`).join("");
+  startSel.onchange = ()=>{ bookingForm.start = startSel.value; };
 
   const roomList = document.getElementById("roomSelectList");
   roomList.innerHTML = ROOMS.map(r=>{
-    const rs = getRoomStatus(r.id, bookingForm.date);
+    const rs = getRoomStatus(r.id, formDate.value || bookingForm.date);
     const sel = bookingForm.roomId===r.id;
     const statusColor = rs.status==="occupied"?"var(--occupied)":rs.status==="soon"?"var(--soon)":"var(--free)";
     const statusColorHex = rs.status==="occupied"?"#EF4444":rs.status==="soon"?"#F59E0B":"#22C55E";
@@ -821,6 +836,11 @@ document.getElementById("confirmBookingBtn").onclick = async ()=>{
     viewDate = bookingForm.date;
     document.getElementById("dateFilter").value = viewDate;
     bookingForm = { roomId:"mfloor", date: TODAY, start:"09:00", duration:"30 min", title:"", host:"", dept:"", purpose:"" };
+    // Reset userSet flags
+    ["formDate","formTitle","formHost","formDept","formPurpose"].forEach(id=>{
+      const el = document.getElementById(id);
+      if(el) delete el.dataset.userSet;
+    });
     bookings = await loadBookings();
     switchTab("overview");
   } catch(err){
@@ -847,17 +867,17 @@ document.getElementById("floorFilter").onchange = renderBookingsList;
 document.getElementById("searchBox").oninput = renderBookingsList;
 
 /* ── Render dispatcher ── */
-function renderAll(){
+function renderAll(fromRefresh=false){
   renderRoomCards();
   if(activeTab==="overview") renderBookingsList();
   if(activeTab==="schedule") renderTimeline();
-  if(activeTab==="book") renderBookForm();
+  if(activeTab==="book" && !fromRefresh) renderBookForm();
 }
 
 async function refreshFromSharePoint(){
   bookings = await loadBookings();
   isLoading = false;
-  renderAll();
+  renderAll(true);
 }
 
 // Initialize MSAL first, then load data
