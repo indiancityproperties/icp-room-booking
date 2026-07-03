@@ -459,7 +459,7 @@ async function loadBookings(){
   try {
     await getListIds();
     const data = await graphFetch(
-      `/sites/${graphSiteId}/lists/${graphListId}/items?expand=fields&$top=500&$orderby=fields/BookingDate,fields/StartTime`
+      `/sites/${graphSiteId}/lists/${graphListId}/items?expand=fields&$top=500`
     );
     return data.value.map(graphItemToBooking);
   } catch(err){
