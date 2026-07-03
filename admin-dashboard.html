@@ -653,7 +653,7 @@ function renderBookingsList(){
     </div>`;
   }).join("");
   container.querySelectorAll(".booking-row").forEach(row=>{
-    row.onclick = ()=> openBookingModal(Number(row.dataset.id));
+    row.onclick = ()=> openBookingModal(row.dataset.id);
   });
 }
 
@@ -691,7 +691,7 @@ function renderTimeline(){
 
   table.innerHTML = html;
   table.querySelectorAll(".timeline-booking").forEach(el=>{
-    el.onclick = ()=> openBookingModal(Number(el.dataset.id));
+    el.onclick = ()=> openBookingModal(el.dataset.id);
   });
   table.querySelectorAll(".timeline-add").forEach(el=>{
     el.onclick = ()=>{
