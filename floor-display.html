@@ -207,10 +207,17 @@ const ROOMFLOOR_TO_ROOMID = { "M-Floor": "mfloor", "2nd Floor": "floor2" };
 
 function graphItemToBooking(item){
   const f = item.fields;
+  // Fix date parsing — adjust for IST (+5:30) offset
+  let date = TODAY;
+  if(f.BookingDate){
+    const d = new Date(f.BookingDate);
+    const istDate = new Date(d.getTime() + (5.5 * 60 * 60 * 1000));
+    date = `${istDate.getUTCFullYear()}-${pad(istDate.getUTCMonth()+1)}-${pad(istDate.getUTCDate())}`;
+  }
   return {
     id: item.id,
     roomId: ROOMFLOOR_TO_ROOMID[f.RoomFloor] || "mfloor",
-    date: f.BookingDate ? f.BookingDate.split("T")[0] : TODAY,
+    date: date,
     start: f.StartTime || "09:00",
     end: f.EndTime || "10:00",
     title: f.Title || "(No title)",
