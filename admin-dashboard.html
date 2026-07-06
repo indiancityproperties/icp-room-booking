@@ -452,11 +452,15 @@ const ROOMID_TO_ROOMFLOOR = { mfloor: "M-Floor", floor2: "2nd Floor" };
 
 function graphItemToBooking(item){
   const f = item.fields;
-  // Fix date parsing — use UTC date to avoid timezone shift
+  // Fix date parsing — split directly to avoid timezone conversion
   let date = TODAY;
   if(f.BookingDate){
+    // Graph API returns UTC datetime, extract date part before 'T'
+    // Then adjust for IST (+5:30) offset
     const d = new Date(f.BookingDate);
-    date = `${d.getUTCFullYear()}-${pad(d.getUTCMonth()+1)}-${pad(d.getUTCDate())}`;
+    // Add 5:30 hours to get IST date
+    const istDate = new Date(d.getTime() + (5.5 * 60 * 60 * 1000));
+    date = `${istDate.getUTCFullYear()}-${pad(istDate.getUTCMonth()+1)}-${pad(istDate.getUTCDate())}`;
   }
   return {
     id: item.id,
