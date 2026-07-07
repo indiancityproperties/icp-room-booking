@@ -264,9 +264,12 @@
             <select id="formStart" class="field-input"></select>
           </div>
         </div>
-        <div class="field-group">
-          <label class="field-label">Duration</label>
-          <div class="duration-chips" id="durationChips"></div>
+        <div class="field-row">
+          <div>
+            <label class="field-label">End Time</label>
+            <select id="formEnd" class="field-input"></select>
+          </div>
+          <div></div>
         </div>
         <div class="field-group">
           <label class="field-label">Meeting Title *</label>
@@ -531,7 +534,7 @@ async function cancelBookingInSharePoint(itemId){
 let bookings = [];
 let viewDate = TODAY;
 let activeTab = "overview";
-let bookingForm = { roomId:"mfloor", date: TODAY, start:"09:00", duration:"30 min", title:"", host:"", dept:"", email:"", purpose:"" };
+let bookingForm = { roomId:"mfloor", date: TODAY, start:"09:00", end:"09:30", title:"", host:"", dept:"", email:"", purpose:"" };
 let currentModalBookingId = null;
 let isLoading = true;
 
@@ -920,7 +923,26 @@ function renderBookForm(){
   if(!startSel.dataset.rendered){
     startSel.innerHTML = TIMES.map(t=>`<option value="${t}" ${t===currentStart?'selected':''}>${fmt12(t)}</option>`).join("");
     startSel.dataset.rendered = "1";
-    startSel.onchange = ()=>{ bookingForm.start = startSel.value; };
+    startSel.onchange = ()=>{
+      bookingForm.start = startSel.value;
+      // Update end time options to be after start time
+      const endSel = document.getElementById("formEnd");
+      const sM = timeToMins(startSel.value);
+      const endTimes = TIMES.filter(t=> timeToMins(t) > sM);
+      endTimes.push(minsToTime(WORK_END*60)); // add 8PM as last option
+      endSel.innerHTML = endTimes.map(t=>`<option value="${t}">${fmt12(t)}</option>`).join("");
+      bookingForm.end = endSel.value;
+    };
+  }
+
+  const endSel = document.getElementById("formEnd");
+  if(!endSel.dataset.rendered){
+    const sM = timeToMins(bookingForm.start);
+    const endTimes = TIMES.filter(t=> timeToMins(t) > sM);
+    endTimes.push(minsToTime(WORK_END*60));
+    endSel.innerHTML = endTimes.map(t=>`<option value="${t}" ${t===bookingForm.end?'selected':''}>${fmt12(t)}</option>`).join("");
+    endSel.dataset.rendered = "1";
+    endSel.onchange = ()=>{ bookingForm.end = endSel.value; };
   }
 
   const roomList = document.getElementById("roomSelectList");
@@ -995,6 +1017,7 @@ document.getElementById("modalCancelBookingBtn").onclick = async ()=>{
 document.getElementById("confirmBookingBtn").onclick = async ()=>{
   bookingForm.date = document.getElementById("formDate").value;
   bookingForm.start = document.getElementById("formStart").value;
+  bookingForm.end = document.getElementById("formEnd").value;
   bookingForm.title = document.getElementById("formTitle").value.trim();
   bookingForm.host = document.getElementById("formHost").value.trim();
   bookingForm.dept = document.getElementById("formDept").value.trim();
@@ -1007,20 +1030,21 @@ document.getElementById("confirmBookingBtn").onclick = async ()=>{
   if(!bookingForm.email){ showToast("Organizer email required","error"); return; }
   if(!bookingForm.email.includes("@")){ showToast("Please enter a valid email","error"); return; }
 
-  // Validate day is Mon-Fri
+  const sM = timeToMins(bookingForm.start);
+  const eM = timeToMins(bookingForm.end);
+
+  if(eM <= sM){ showToast("End time must be after start time","error"); return; }
+
   const d = new Date(bookingForm.date+"T00:00:00");
   const dow = d.getDay();
   if(dow===0 || dow===6){ showToast("Bookings allowed Monday to Friday only","error"); return; }
 
-  // Validate within 1 week advance
   const maxDate = new Date(); maxDate.setDate(maxDate.getDate()+7);
   if(d > maxDate){ showToast("Bookings allowed up to 1 week in advance","error"); return; }
 
-  const sM = timeToMins(bookingForm.start);
-  const dur = durationToMins(bookingForm.duration);
-  const eM = sM + dur;
   if(eM > WORK_END*60){ showToast(`Meeting must end by ${fmt12(minsToTime(WORK_END*60))}`,"error"); return; }
-  const end = minsToTime(eM);
+
+  const end = bookingForm.end;
 
   // Re-fetch latest bookings right before conflict check to minimize race conditions
   // with Outlook/Teams bookings landing via Power Automate at the same time.
@@ -1036,7 +1060,7 @@ document.getElementById("confirmBookingBtn").onclick = async ()=>{
     showToast("Room booked! Confirmation email sent.");
     viewDate = bookingForm.date;
     document.getElementById("dateFilter").value = viewDate;
-    bookingForm = { roomId:"mfloor", date: TODAY, start:"09:00", duration:"30 min", title:"", host:"", dept:"", email:"", purpose:"" };
+    bookingForm = { roomId:"mfloor", date: TODAY, start:"09:00", end:"09:30", title:"", host:"", dept:"", email:"", purpose:"" };
     // Reset userSet flags
     ["formDate","formTitle","formHost","formDept","formPurpose","formEmail"].forEach(id=>{
       const el = document.getElementById(id);
@@ -1061,6 +1085,8 @@ function switchTab(tab){
     // Reset rendered flags so form re-initializes on tab switch
     const startSel = document.getElementById("formStart");
     if(startSel) delete startSel.dataset.rendered;
+    const endSel = document.getElementById("formEnd");
+    if(endSel) delete endSel.dataset.rendered;
     ["formDate","formTitle","formHost","formDept","formPurpose","formEmail"].forEach(id=>{
       const el = document.getElementById(id);
       if(el) delete el.dataset.userSet;
