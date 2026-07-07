@@ -967,12 +967,6 @@ function renderBookForm(){
   roomList.querySelectorAll(".room-select-item").forEach(el=>{
     el.onclick = ()=>{ bookingForm.roomId = el.dataset.room; renderBookForm(); };
   });
-
-  const chips = document.getElementById("durationChips");
-  chips.innerHTML = DURATIONS.map(d=>`<div class="duration-chip ${bookingForm.duration===d?'selected':''}" data-d="${d}">${d}</div>`).join("");
-  chips.querySelectorAll(".duration-chip").forEach(el=>{
-    el.onclick = ()=>{ bookingForm.duration = el.dataset.d; renderBookForm(); };
-  });
 }
 
 /* ── Modal ── */
