@@ -322,7 +322,42 @@
     <div class="modal-rows" id="modalRows"></div>
     <div class="modal-actions">
       <button class="btn-lg btn-secondary" id="modalCloseBtn2">Close</button>
+      <button class="btn-lg" id="modalEditBookingBtn" style="background:rgba(201,168,76,0.1);border:1px solid rgba(201,168,76,0.3);color:var(--gold);">✏️ Edit</button>
       <button class="btn-lg" id="modalCancelBookingBtn" style="background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);color:var(--occupied);">Cancel Booking</button>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Booking Modal -->
+<div class="modal-overlay" id="editModal">
+  <div class="modal-box" style="max-width:480px;">
+    <div class="modal-head">
+      <div>
+        <div class="modal-title" id="editModalTitle">Edit Booking</div>
+        <div class="modal-sub" id="editModalSub"></div>
+      </div>
+      <button class="modal-close" id="editModalCloseBtn">✕</button>
+    </div>
+    <div class="gold-line"></div>
+    <div style="margin-top:16px;display:flex;flex-direction:column;gap:12px;">
+      <div>
+        <label class="field-label">Date</label>
+        <input type="date" id="editDate" class="field-input">
+      </div>
+      <div class="field-row">
+        <div>
+          <label class="field-label">Start Time</label>
+          <select id="editStart" class="field-input"></select>
+        </div>
+        <div>
+          <label class="field-label">End Time</label>
+          <select id="editEnd" class="field-input"></select>
+        </div>
+      </div>
+    </div>
+    <div class="modal-actions" style="margin-top:20px;">
+      <button class="btn-lg btn-secondary" id="editModalCloseBtn2">Cancel</button>
+      <button class="btn-lg confirm" id="editConfirmBtn">Save Changes</button>
     </div>
   </div>
 </div>
@@ -987,7 +1022,96 @@ function openBookingModal(id){
 }
 function closeModal(){ document.getElementById("bookingModal").classList.remove("show"); currentModalBookingId=null; }
 
-document.getElementById("modalCloseBtn").onclick = closeModal;
+async function updateBookingInSharePoint(itemId, date, start, end){
+  await getListIds();
+  return graphFetch(`/sites/${graphSiteId}/lists/${graphListId}/items/${itemId}/fields`, {
+    method: "PATCH",
+    body: JSON.stringify({
+      BookingDate: new Date(date).toISOString(),
+      StartTime: start,
+      EndTime: end,
+    })
+  });
+}
+
+/* ── Edit Modal ── */
+function openEditModal(id){
+  const b = bookings.find(x=>x.id===id);
+  if(!b) return;
+  currentModalBookingId = id;
+  const room = ROOMS.find(r=>r.id===b.roomId);
+  document.getElementById("editModalSub").textContent = `${room.floor} · ${b.title}`;
+  document.getElementById("editDate").value = b.date;
+
+  // Populate start time
+  const startSel = document.getElementById("editStart");
+  startSel.innerHTML = TIMES.map(t=>`<option value="${t}" ${t===b.start?'selected':''}>${fmt12(t)}</option>`).join("");
+
+  // Populate end time
+  const endSel = document.getElementById("editEnd");
+  const sM = timeToMins(b.start);
+  const endTimes = [...TIMES.filter(t=> timeToMins(t) > sM), minsToTime(WORK_END*60)];
+  endSel.innerHTML = endTimes.map(t=>`<option value="${t}" ${t===b.end?'selected':''}>${fmt12(t)}</option>`).join("");
+
+  startSel.onchange = ()=>{
+    const newSM = timeToMins(startSel.value);
+    const newEndTimes = [...TIMES.filter(t=> timeToMins(t) > newSM), minsToTime(WORK_END*60)];
+    endSel.innerHTML = newEndTimes.map(t=>`<option value="${t}">${fmt12(t)}</option>`).join("");
+  };
+
+  document.getElementById("bookingModal").classList.remove("show");
+  document.getElementById("editModal").classList.add("show");
+}
+
+function closeEditModal(){
+  document.getElementById("editModal").classList.remove("show");
+  currentModalBookingId = null;
+}
+
+document.getElementById("editModalCloseBtn").onclick = closeEditModal;
+document.getElementById("editModalCloseBtn2").onclick = closeEditModal;
+document.getElementById("editModal").onclick = (e)=>{ if(e.target.id==="editModal") closeEditModal(); };
+
+document.getElementById("modalEditBookingBtn").onclick = ()=>{
+  if(currentModalBookingId==null) return;
+  openEditModal(currentModalBookingId);
+};
+
+document.getElementById("editConfirmBtn").onclick = async ()=>{
+  const date = document.getElementById("editDate").value;
+  const start = document.getElementById("editStart").value;
+  const end = document.getElementById("editEnd").value;
+
+  if(timeToMins(end) <= timeToMins(start)){ showToast("End time must be after start time","error"); return; }
+
+  const d = new Date(date+"T00:00:00");
+  const dow = d.getDay();
+  if(dow===0 || dow===6){ showToast("Bookings allowed Monday to Friday only","error"); return; }
+
+  // Conflict check
+  const sM = timeToMins(start);
+  const eM = timeToMins(end);
+  const b = bookings.find(x=>x.id===currentModalBookingId);
+  const conflict = bookings.find(bk=>
+    bk.id !== currentModalBookingId &&
+    bk.roomId === b.roomId &&
+    bk.date === date &&
+    bk.status === "confirmed" &&
+    !(eM<=timeToMins(bk.start) || sM>=timeToMins(bk.end))
+  );
+  if(conflict){ showToast(`Conflict: ${fmt12(conflict.start)}–${fmt12(conflict.end)} already booked`,"error"); return; }
+
+  try {
+    await updateBookingInSharePoint(currentModalBookingId, date, start, end);
+    showToast("Booking updated successfully!");
+    closeEditModal();
+    bookings = await loadBookings();
+    renderAll();
+  } catch(err){
+    console.error(err);
+    showToast("Failed to update booking","error");
+  }
+};
 document.getElementById("modalCloseBtn2").onclick = closeModal;
 document.getElementById("bookingModal").onclick = (e)=>{ if(e.target.id==="bookingModal") closeModal(); };
 document.getElementById("modalCancelBookingBtn").onclick = async ()=>{
