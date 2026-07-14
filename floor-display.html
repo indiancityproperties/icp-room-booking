@@ -18,7 +18,7 @@
   body{font-family:'Segoe UI',Inter,-apple-system,sans-serif;background:var(--navy);color:var(--white);user-select:none;}
   @keyframes pulse{0%,100%{transform:scale(1);opacity:0.25;}50%{transform:scale(1.5);opacity:0.1;}}
 
-  .app{display:flex;flex-direction:column;height:100vh;padding-top:0;}
+  .app{display:flex;flex-direction:column;height:100vh;padding-top:44px;}
   .app.has-demo{padding-top:42px;}
 
   /* Top bar */
@@ -379,14 +379,7 @@ function tickClock(){
     <div class="clock-date">${d.toLocaleDateString("en-IN",{weekday:"long",day:"2-digit",month:"long",year:"numeric"})}</div>`;
 }
 
-/* Demo switcher (hide this block + bar in production by deleting #demoSwitch and the JS below) */
-// Hide demo switcher if floor param is in URL
-if(new URLSearchParams(window.location.search).get("floor")){
-  document.getElementById("demoSwitch").style.display = "none";
-} else {
-  document.getElementById("app").classList.add("has-demo");
-}
-
+/* Demo switcher — always visible for floor switching */
 const demoSwitch = document.getElementById("demoSwitch");
 function updateDemoButtons(){
   demoSwitch.querySelectorAll(".demo-btn").forEach(b=> b.classList.toggle("active", b.dataset.floor===currentFloor));
