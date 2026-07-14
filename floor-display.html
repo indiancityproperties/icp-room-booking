@@ -87,9 +87,9 @@
   .detail-close{margin-top:26px;width:100%;padding:14px;background:linear-gradient(135deg,var(--gold),var(--gold-light));border:none;color:var(--navy);border-radius:12px;font-size:14px;font-weight:800;cursor:pointer;}
 
   /* Floor switcher (demo helper, top-left small) */
-  .demo-switch{position:fixed;top:0;left:50%;transform:translateX(-50%);background:var(--navy-mid);border:1px solid var(--navy-border);border-top:none;border-radius:0 0 16px 16px;padding:8px 16px;z-index:999;display:flex;gap:8px;align-items:center;box-shadow:0 4px 16px rgba(0,0,0,0.4);}
-  .demo-switch span{font-size:12px;color:var(--text-muted);margin-right:4px;text-transform:uppercase;letter-spacing:0.5px;}
-  .demo-btn{padding:6px 16px;border-radius:8px;border:none;cursor:pointer;background:transparent;color:var(--text-sec);font-size:13px;font-weight:700;}
+  .demo-switch{position:fixed;top:0;left:50%;transform:translateX(-50%);background:var(--navy-mid);border:1px solid var(--navy-border);border-top:none;border-radius:0 0 16px 16px;padding:8px 20px;z-index:999;display:flex;gap:12px;align-items:center;box-shadow:0 4px 16px rgba(0,0,0,0.4);}
+  .demo-btn{padding:8px 20px;border-radius:10px;border:1px solid var(--navy-border);cursor:pointer;background:var(--navy-light);color:var(--text-sec);font-size:15px;font-weight:800;letter-spacing:0.5px;}
+  .demo-btn.active{background:linear-gradient(135deg,var(--gold),var(--gold-light));color:var(--navy);border-color:var(--gold);}
   .demo-btn.active{background:linear-gradient(135deg,var(--gold),var(--gold-light));color:var(--navy);}
 </style>
 </head>
@@ -98,7 +98,6 @@
 <!-- Demo helper: lets you preview all 3 tablets in one file.
      In production, each tablet's URL has its own ?floor= parameter and this bar is hidden. -->
 <div class="demo-switch" id="demoSwitch">
-  <span>Preview tablet:</span>
   <button class="demo-btn" data-floor="mfloor">M-Floor</button>
   <button class="demo-btn" data-floor="floor2">2nd Floor</button>
 </div>
